@@ -1,0 +1,102 @@
+---
+title: "A7"
+author: "Matthieu Tuffery"
+date: '2022-03-09'
+output: html_document
+---
+
+
+Repository: 
+https://github.com/MatthieuTu/A7_TUFFERY_MATTHIEU
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Dragon images
+A drawing of a dragon by [Sarah Vettori](https://www.instagram.com/sarahsogna/?hl=en)
+![](https://images.squarespace-cdn.com/content/v1/55eff2bfe4b04161be75e12c/1633688909432-83LCQAPL46TG8OM7AWSJ/709_LowCarbsDragon1.jpg)
+
+Definitely a dragon, nothing interesting to see here.[source](https://i.pinimg.com/564x/6a/9e/92/6a9e924dfc3e0a256b6eedb2dde164e4--dragon-costume-costume-works.jpg)
+
+![](https://i.pinimg.com/564x/6a/9e/92/6a9e924dfc3e0a256b6eedb2dde164e4--dragon-costume-costume-works.jpg)
+
+A screeching dragon by the artist team [Sixmorevodka](https://sixmorevodka.com/work/legends-of-runeterra/) for the video game Legends of Runeterra. 
+![](https://img2.storyblok.com/3000x0/filters:quality(90):format(webp)/f/84907/2560x1280/88403184bc/screeching-dragon.jpg)
+
+```{r, echo = F, warning= F}
+library(ape)
+library(reshape2)
+library(ggtree)
+library(ggplot2)
+```
+
+Importing the files with the traits and weights and formating them
+```{r}
+WtDragonNexus = read.nexus.data("input/DragonMatrix.nex")
+
+weightD = read.csv("input/Weights.csv")
+weight = paste(weightD$Weight, collapse = "")
+Weights = unlist(strsplit(weight, split=""))
+```
+
+turning the encoding of the the weight into integers.
+```{r}
+WeightsNum = rep(NA,length(Weights))
+for(i in 1:length(WeightsNum)){
+  if(Weights[i] %in% LETTERS){
+    WeightsNum[i] = which(LETTERS==Weights[i])+9
+  } else {
+    WeightsNum[i] = Weights[i]
+  }
+}
+WeightsNum = as.numeric(WeightsNum)
+```
+
+```{r}
+for (i in 1:length(WtDragonNexus)){
+  RepWeight = WtDragonNexus[[i]]==1
+  WtDragonNexus[[i]][RepWeight] = WeightsNum[RepWeight]
+  RepWeight = NA
+}
+```
+
+Creation of a distance matrix using euclidean method.
+```{r}
+WtDragonNexusDF<-data.frame(matrix(unlist(WtDragonNexus),ncol=78,byrow=T))
+row.names(WtDragonNexusDF)<-names(WtDragonNexus)
+WtDragonDist<-dist(WtDragonNexusDF,method='euclidean')
+WtDragonDistMat = as.matrix(WtDragonDist)
+```
+
+visualisation of the distance matrix using ggplot and tile geometry
+```{r}
+WtPDat = melt(WtDragonDistMat)
+ggplot(data = WtPDat, aes(x=Var1, y=Var2, fill = value)) +
+    geom_tile() + scale_fill_gradientn(colours = c("black", "blue","cyan", "white"))+
+    theme(axis.text.x= element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+
+creation of the tree, and formating it so that it has group names. 
+```{r}
+WtDragonTreeME = fastme.bal(WtDragonDist);
+
+Dtype = gsub("\\.|\\d+|X+","", row.names(WtDragonNexusDF))
+
+Dtypegroup = split(row.names(WtDragonNexusDF), Dtype)
+
+WtDtcol = groupOTU(WtDragonTreeME, Dtypegroup)
+
+```
+
+
+Creation of a fan tree, with branch ant branch tips colored according to the group. The last common ancestors to the three added dragons is circled in blue
+```{r}
+ggtree(WtDtcol, layout = "fan",open.angle = 60, branch.length = 'none', aes(colour = group))+
+  geom_tiplab(size = 2, aes(angle = angle)) +
+  annotate(geom = "text", 2, 0, hjust=0, size=7, label ="\n\n\nThe  Dragon \n      Phylogeny", ) + 
+  geom_tippoint(aes(color=group), size=1.5)+ 
+  geom_point2(aes(subset=node==122), color='darkblue', shape = 21, size=4)
+```
